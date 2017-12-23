@@ -3,7 +3,6 @@ package main
 import (
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/streadway/amqp"
 )
 
