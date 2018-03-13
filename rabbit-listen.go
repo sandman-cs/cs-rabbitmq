@@ -1,8 +1,9 @@
-package main
+package core
 
 import (
 	"time"
 
+	"github.com/sandman-cs/core"
 	"github.com/streadway/amqp"
 )
 
@@ -10,12 +11,37 @@ var (
 	rabbitConn       *amqp.Connection
 	rabbitCloseError chan *amqp.Error
 	amqpURI          string
-	
+	brokerUsr        string
+	brokerPwd        string
+	broker           string
+	vHost            string
 )
 
-func initRabbitMQ() {
+func init() {
+	brokerUsr = "user"
+	brokerPwd = "pwd"
+	broker = "localhost"
+	vHost = "/"
 
-	amqpURI = "amqp://" + conf.BrokerUser + ":" + conf.BrokerPwd + "@" + conf.Broker + conf.BrokerVhost
+}
+
+func initRabbitMQ(iBroker string, ivHost string, iUsr string, iPwd string) {
+
+	//Override default values if they're provided...
+	if iBroker != "" {
+		broker = iBroker
+	}
+	if iUsr != "" {
+		brokerUsr = iUsr
+	}
+	if iPwd != "" {
+		brokerPwd = iPwd
+	}
+	if ivHost != "" {
+		vHost = ivHost
+	}
+
+	amqpURI = "amqp://" + brokerUsr + ":" + brokerPwd + "@" + broker + vHost
 
 	// create the rabbitmq error channel
 	rabbitCloseError = make(chan *amqp.Error)
@@ -25,11 +51,9 @@ func initRabbitMQ() {
 
 	// establish the rabbitmq connection by sending
 	// an error and thus calling the error callback
-	SendMessage("Connecting to Broker---")
 	rabbitCloseError <- amqp.ErrClosed
 
 	for rabbitConn == nil {
-		SendMessage("Waiting for Connection to Broker...")
 		time.Sleep(1 * time.Second)
 	}
 }
@@ -43,7 +67,7 @@ func rabbitConnector(uri string) {
 	for {
 		rabbitErr = <-rabbitCloseError
 		if rabbitErr != nil {
-			sendMessage("Connecting to RabbitMQ")
+			core.SendMessage("Connecting to RabbitMQ")
 			rabbitConn = connectToRabbitMQ(uri)
 			rabbitCloseError = make(chan *amqp.Error)
 			rabbitConn.NotifyClose(rabbitCloseError)
@@ -62,8 +86,8 @@ func connectToRabbitMQ(uri string) *amqp.Connection {
 			return conn
 		}
 
-		checkError(err)
-		sendMessage("Trying to reconnect to RabbitMQ")
+		core.CheckError(err)
+		core.SendMessage("Trying to reconnect to RabbitMQ")
 		time.Sleep(500 * time.Millisecond)
 	}
 }
