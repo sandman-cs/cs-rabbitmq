@@ -1,4 +1,4 @@
-package core
+package coreRMQ
 
 import (
 	"time"
@@ -8,54 +8,24 @@ import (
 )
 
 var (
-	rabbitConn       *amqp.Connection
-	rabbitCloseError chan *amqp.Error
-	amqpURI          string
-	brokerUsr        string
-	brokerPwd        string
-	broker           string
-	vHost            string
+//rabbitConn       *amqp.Connection
+//rabbitCloseError chan *amqp.Error
+//amqpURI          string
 )
 
-func init() {
-	brokerUsr = "user"
-	brokerPwd = "pwd"
-	broker = "localhost"
-	vHost = "/"
+func initRabbitMQ(broker string, vHost string, usr string, pwd string) {
 
-}
-
-func initRabbitMQ(iBroker string, ivHost string, iUsr string, iPwd string) {
-
-	//Override default values if they're provided...
-	if iBroker != "" {
-		broker = iBroker
-	}
-	if iUsr != "" {
-		brokerUsr = iUsr
-	}
-	if iPwd != "" {
-		brokerPwd = iPwd
-	}
-	if ivHost != "" {
-		vHost = ivHost
-	}
-
-	amqpURI = "amqp://" + brokerUsr + ":" + brokerPwd + "@" + broker + vHost
+	amqpURI := "amqp://" + usr + ":" + pwd + "@" + broker + vHost
 
 	// create the rabbitmq error channel
-	rabbitCloseError = make(chan *amqp.Error)
+	rabbitCloseError := make(chan *amqp.Error)
 
 	// run the callback in a separate thread
-	go rabbitConnector(amqpURI)
+	rabbitConnector(amqpURI)
 
 	// establish the rabbitmq connection by sending
 	// an error and thus calling the error callback
 	rabbitCloseError <- amqp.ErrClosed
-
-	for rabbitConn == nil {
-		time.Sleep(1 * time.Second)
-	}
 }
 
 // re-establish the connection to RabbitMQ in case
@@ -63,15 +33,22 @@ func initRabbitMQ(iBroker string, ivHost string, iUsr string, iPwd string) {
 //
 func rabbitConnector(uri string) {
 	var rabbitErr *amqp.Error
+	var rabbitConn *amqp.Connection
 
-	for {
-		rabbitErr = <-rabbitCloseError
-		if rabbitErr != nil {
-			core.SendMessage("Connecting to RabbitMQ")
-			rabbitConn = connectToRabbitMQ(uri)
-			rabbitCloseError = make(chan *amqp.Error)
-			rabbitConn.NotifyClose(rabbitCloseError)
+	go func() {
+		for {
+			rabbitErr = <-rabbitCloseError
+			if rabbitErr != nil {
+				core.SendMessage("Connecting to RabbitMQ")
+				rabbitConn = connectToRabbitMQ(uri)
+				rabbitCloseError = make(chan *amqp.Error)
+				rabbitConn.NotifyClose(rabbitCloseError)
+			}
 		}
+	}()
+
+	for rabbitConn == nil {
+		time.Sleep(1 * time.Second)
 	}
 }
 
